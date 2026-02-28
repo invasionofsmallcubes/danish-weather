@@ -1,0 +1,14 @@
+name = "danish-weather"
+main = ".open-next/worker.js"
+compatibility_date = "2026-02-28"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[env.production]
+name = "danish-weather-production"
+routes = [
+  { pattern = "danish-weather.pages.dev", zone_name = "pages.dev" }
+]

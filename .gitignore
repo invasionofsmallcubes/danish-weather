@@ -13,6 +13,12 @@
 # Production
 /build
 
+# Cloudflare/OpenNext build artifacts
+.open-next/
+.wrangler/
+node_modules/.wrangler/
+cloudflare-env.d.ts
+
 # Misc
 .DS_Store
 *.pem
