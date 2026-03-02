@@ -179,7 +179,7 @@ deploy:
       env:
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      run: npm run deploy
+      run: echo $CLOUDFLARE_API_TOKEN; npm run deploy
 ```
 
 ## Local Testing
