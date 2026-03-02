@@ -1,5 +1,6 @@
 import typescript from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
+import nextPlugin from "@next/eslint-plugin-next";
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -28,6 +29,7 @@ export default [
     },
     plugins: {
       "@typescript-eslint": typescript,
+      "@next/next": nextPlugin,
     },
     rules: {
       "react/react-in-jsx-scope": "off",
