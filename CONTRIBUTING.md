@@ -38,26 +38,76 @@ The app will be available at [http://localhost:3000](http://localhost:3000).
 ```bash
 npm run build
 npm run lint
+npm run test              # Run all tests once
+npm run test:watch       # Run tests in watch mode
+npm run test:coverage    # Generate coverage report
 ```
 
 ### Code Standards
 
 - **TypeScript**: We use TypeScript for type safety. All code should be properly typed.
+- **Testing**: Write tests for new features and bug fixes. Aim for at least 80% code coverage.
 - **Formatting**: Follow the existing code style. Consider using Prettier if configured.
 - **Naming**: Use descriptive names for variables, functions, and components.
 - **Comments**: Add comments for complex logic, but keep them concise.
+
+### Writing Tests
+
+We use **Jest** and **React Testing Library** for testing. Here are guidelines:
+
+#### Creating Test Files
+
+- Place test files in `__tests__` directories or use `.test.ts`/`.test.tsx` naming
+- Example structures:
+  - Utility tests: `src/lib/utils/__tests__/myUtils.test.ts`
+  - Component tests: `src/components/__tests__/MyComponent.test.tsx`
+
+#### Test Examples
+
+**For utility functions:**
+```typescript
+import { getWeatherDescription } from '@/lib/utils/weatherCodes';
+
+describe('getWeatherDescription', () => {
+  it('should return correct description for clear sky', () => {
+    expect(getWeatherDescription(0)).toBe('Clear sky');
+  });
+});
+```
+
+**For React components:**
+```typescript
+import { render, screen } from '@testing-library/react';
+import { MyComponent } from '@/components/MyComponent';
+
+describe('MyComponent', () => {
+  it('should render content', () => {
+    render(<MyComponent />);
+    expect(screen.getByText('Expected text')).toBeInTheDocument();
+  });
+});
+```
+
+#### Coverage Requirements
+
+- **Target**: 80% minimum coverage
+- Exceptions: Generated files, test files themselves, and `.d.ts` files are excluded
+- View coverage report: `npm run test:coverage`
+- The CI pipeline will fail if coverage drops below thresholds
 
 ### Making Changes
 
 1. Make your changes in your feature branch
 2. Test your changes thoroughly:
    ```bash
+   npm run test:watch
    npm run build
    npm run dev
    ```
-3. Ensure no TypeScript errors:
+3. Ensure no TypeScript errors and tests pass:
    ```bash
    npm run lint
+   npm run test
    ```
 
 ### Committing Changes
