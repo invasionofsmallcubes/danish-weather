@@ -1,14 +1,31 @@
 'use client'
 
 import { DmiCurrentConditions } from '@/lib/schemas/dmi'
+import { WeatherDiff } from '@/lib/api'
 import { degreesToCompass } from '@/lib/utils/wind'
 
 interface DmiWeatherDisplayProps {
   data: DmiCurrentConditions
+  diff?: WeatherDiff
   isLoading?: boolean
 }
 
-export function DmiWeatherDisplay({ data, isLoading = false }: DmiWeatherDisplayProps) {
+function DiffBadge({ value, unit }: { value: number; unit: string }) {
+  const sign = value > 0 ? '+' : ''
+  const colour =
+    value > 0
+      ? 'text-orange-600'
+      : value < 0
+        ? 'text-blue-600'
+        : 'text-gray-500'
+  return (
+    <span className={`ml-2 text-sm font-normal ${colour}`}>
+      ({sign}{value}{unit})
+    </span>
+  )
+}
+
+export function DmiWeatherDisplay({ data, diff, isLoading = false }: DmiWeatherDisplayProps) {
   if (isLoading) {
     return (
       <div className="animate-pulse rounded-lg bg-gray-200 p-6">
@@ -29,12 +46,18 @@ export function DmiWeatherDisplay({ data, isLoading = false }: DmiWeatherDisplay
           <span className="text-gray-700">Temperature:</span>
           <span className="text-2xl font-semibold text-red-600">
             {data.temperature.value}{data.temperature.unit}
+            {diff?.temperature != null && (
+              <DiffBadge value={diff.temperature} unit="°C" />
+            )}
           </span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-gray-700">Wind Speed:</span>
           <span className="text-lg font-semibold text-red-600">
             {data.windSpeed.value} {data.windSpeed.unit}
+            {diff?.windSpeed != null && (
+              <DiffBadge value={diff.windSpeed} unit=" m/s" />
+            )}
           </span>
         </div>
         <div className="flex justify-between items-center">
@@ -48,6 +71,9 @@ export function DmiWeatherDisplay({ data, isLoading = false }: DmiWeatherDisplay
             <span className="text-gray-700">Humidity:</span>
             <span className="text-lg font-semibold text-red-600">
               {data.humidity}%
+              {diff?.humidity != null && (
+                <DiffBadge value={diff.humidity} unit="%" />
+              )}
             </span>
           </div>
         )}
@@ -56,6 +82,9 @@ export function DmiWeatherDisplay({ data, isLoading = false }: DmiWeatherDisplay
             <span className="text-gray-700">Wind Direction:</span>
             <span className="text-lg font-semibold text-red-600">
               {degreesToCompass(data.windDirection.value)}
+              {diff?.windDirection != null && (
+                <DiffBadge value={diff.windDirection} unit="°" />
+              )}
             </span>
           </div>
         )}

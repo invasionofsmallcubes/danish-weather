@@ -159,7 +159,63 @@ describe('fetchWeatherFromBothSources', () => {
     const result = await fetchWeatherFromBothSources(55.0, 12.0)
 
     // Verify shape with explicit key checks
-    expect(Object.keys(result).sort()).toEqual(['dmi', 'errors', 'yr'])
+    expect(Object.keys(result).sort()).toEqual(['diff', 'dmi', 'errors', 'yr'])
     expect(Object.keys(result.errors).sort()).toEqual(['dmi', 'yr'])
+    expect(Object.keys(result.diff).sort()).toEqual([
+      'humidity', 'temperature', 'windDirection', 'windSpeed',
+    ])
+  })
+
+  it('should compute correct diffs when both sources succeed', async () => {
+    mockFetchYr.mockResolvedValue(validYrConditions)
+    mockFetchDmi.mockResolvedValue(validDmiConditions)
+
+    const result = await fetchWeatherFromBothSources(55.0, 12.0)
+
+    // DMI 8.5 − YR 7.2 = 1.3
+    expect(result.diff.temperature).toBe(1.3)
+    // DMI 5.0 − YR 5.8 = −0.8
+    expect(result.diff.windSpeed).toBe(-0.8)
+    // DMI 82 − YR 78 = 4
+    expect(result.diff.humidity).toBe(4)
+    // validDmiConditions has no windDirection → null
+    expect(result.diff.windDirection).toBeNull()
+  })
+
+  it('should compute windDirection diff when both sides provide it', async () => {
+    const dmiWithDir = {
+      ...validDmiConditions,
+      windDirection: { value: 240, unit: 'degrees' as const },
+    }
+    mockFetchYr.mockResolvedValue(validYrConditions)   // windDirection 210
+    mockFetchDmi.mockResolvedValue(dmiWithDir)          // windDirection 240
+
+    const result = await fetchWeatherFromBothSources(55.0, 12.0)
+
+    // 240 − 210 = 30
+    expect(result.diff.windDirection).toBe(30)
+  })
+
+  it('should return null diffs when both sources fail', async () => {
+    mockFetchYr.mockRejectedValue(new Error('YR down'))
+    mockFetchDmi.mockRejectedValue(new Error('DMI down'))
+
+    const result = await fetchWeatherFromBothSources(55.0, 12.0)
+
+    expect(result.diff.temperature).toBeNull()
+    expect(result.diff.windSpeed).toBeNull()
+    expect(result.diff.windDirection).toBeNull()
+    expect(result.diff.humidity).toBeNull()
+  })
+
+  it('should return null diffs when one source fails', async () => {
+    mockFetchYr.mockRejectedValue(new Error('YR down'))
+    mockFetchDmi.mockResolvedValue(validDmiConditions)
+
+    const result = await fetchWeatherFromBothSources(55.0, 12.0)
+
+    expect(result.diff.temperature).toBeNull()
+    expect(result.diff.windSpeed).toBeNull()
+    expect(result.diff.humidity).toBeNull()
   })
 })

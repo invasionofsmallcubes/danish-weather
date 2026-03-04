@@ -106,7 +106,7 @@ export function WeatherContainer({
         )}
 
         {data?.dmi ? (
-          <DmiWeatherDisplay data={data.dmi} isLoading={isLoading} />
+          <DmiWeatherDisplay data={data.dmi} diff={data.diff} isLoading={isLoading} />
         ) : (
           <div className="rounded-lg border border-red-200 bg-red-50 p-6">
             <h2 className="mb-4 text-2xl font-bold text-red-900">DMI Weather</h2>
