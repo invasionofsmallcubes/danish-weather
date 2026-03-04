@@ -2,10 +2,23 @@ import React from 'react'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { WeatherContainer } from '@/components/WeatherContainer'
 import * as apiModule from '@/lib/api'
+import * as dmiApiModule from '@/lib/api/dmi'
+import * as yrApiModule from '@/lib/api/yr'
 
-// Mock the API module
+// Mock the weather comparison API module
 jest.mock('@/lib/api', () => ({
   fetchWeatherFromBothSources: jest.fn(),
+}))
+
+// Mock both forecast functions so WeatherContainer tests stay unit-level
+jest.mock('@/lib/api/dmi', () => ({
+  ...jest.requireActual('@/lib/api/dmi'),
+  fetchDmiEdrForecast: jest.fn(),
+}))
+
+jest.mock('@/lib/api/yr', () => ({
+  ...jest.requireActual('@/lib/api/yr'),
+  fetchYrForecast: jest.fn(),
 }))
 
 const mockYrData = {
@@ -35,6 +48,9 @@ describe('WeatherContainer', () => {
     jest.clearAllMocks()
     jest.useFakeTimers()
     ;(apiModule.fetchWeatherFromBothSources as jest.Mock).mockResolvedValue(fullMockData)
+    // Both forecasts resolve with empty arrays by default in these unit tests
+    ;(dmiApiModule.fetchDmiEdrForecast as jest.Mock).mockResolvedValue([])
+    ;(yrApiModule.fetchYrForecast as jest.Mock).mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -166,9 +182,11 @@ describe('WeatherContainer', () => {
     })
 
     await waitFor(() => {
-      // The headings in placeholder divs should be present
+      // The headings in placeholder divs should be present (YR + DMI + DMI Forecast)
       const headings = screen.getAllByRole('heading', { level: 2 })
-      expect(headings).toHaveLength(2)
+      expect(headings.length).toBeGreaterThanOrEqual(2)
+      expect(screen.getByText('YR.no Weather')).toBeInTheDocument()
+      expect(screen.getByText('DMI Weather')).toBeInTheDocument()
     })
   })
 

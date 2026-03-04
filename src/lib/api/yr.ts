@@ -1,52 +1,6 @@
-import { YrWeatherDataSchema, YrCurrentConditionsSchema } from '@/lib/schemas/yr'
+import { YrWeatherDataSchema, YrCurrentConditionsSchema, YrForecastHourSchema, type YrForecastHour } from '@/lib/schemas/yr'
+import { getProxyData } from './proxy'
 import { z } from 'zod'
-
-interface FetchOptions {
-  timeout?: number
-  retries?: number
-}
-
-const DEFAULT_OPTIONS: Required<FetchOptions> = {
-  timeout: 5000,
-  retries: 2,
-}
-
-async function fetchWithRetry(
-  url: string,
-  options: FetchOptions = {},
-): Promise<Response> {
-  const timeout = options.timeout ?? DEFAULT_OPTIONS.timeout
-  const retries = options.retries ?? DEFAULT_OPTIONS.retries
-
-  let lastError: Error | null = null
-
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-      const response = await fetch(url, {
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      return response
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
-
-      if (i < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)))
-      }
-    }
-  }
-
-  throw lastError || new Error('Failed to fetch after retries')
-}
 
 interface MetNorwayResponse {
   properties: {
@@ -99,9 +53,7 @@ function getSymbolDescription(code: string): string {
  */
 export async function fetchYrWeatherData(latitude: number, longitude: number) {
   try {
-    const url = `/api/weather?latitude=${latitude}&longitude=${longitude}`
-    const response = await fetchWithRetry(url, { timeout: 5000, retries: 2 })
-    const data = await response.json()
+    const data = await getProxyData(latitude, longitude)
 
     // Extract MET Norway data from proxy response
     const metData = data.yr as MetNorwayResponse | null
@@ -156,6 +108,32 @@ export async function fetchYrCurrentConditions(latitude: number, longitude: numb
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new Error(`Invalid YR.no conditions: ${error.message}`)
+    }
+    throw error
+  }
+}
+
+/**
+ * Fetch 24-hour hourly forecast from YR.no (via Next.js proxy).
+ * The route extracts this server-side from the MET Norway timeseries.
+ */
+export async function fetchYrForecast(
+  latitude: number,
+  longitude: number,
+): Promise<YrForecastHour[]> {
+  const data = await getProxyData(latitude, longitude)
+
+  const raw = data.yrForecast as unknown
+
+  if (!Array.isArray(raw)) {
+    throw new Error('Invalid YR forecast response: yrForecast is not an array')
+  }
+
+  try {
+    return z.array(YrForecastHourSchema).parse(raw)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(`Invalid YR forecast data: ${error.message}`)
     }
     throw error
   }

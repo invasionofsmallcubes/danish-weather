@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { fetchWeatherFromBothSources, WeatherComparison } from '@/lib/api'
+import { fetchDmiEdrForecast } from '@/lib/api/dmi'
+import { fetchYrForecast } from '@/lib/api/yr'
+import { ForecastHour } from '@/lib/schemas/forecast'
 import { YrWeatherDisplay } from './YrWeatherDisplay'
 import { DmiWeatherDisplay } from './DmiWeatherDisplay'
+import { ForecastComparisonDisplay } from './ForecastComparisonDisplay'
 
 interface WeatherContainerProps {
   latitude?: number
@@ -14,40 +18,75 @@ export function WeatherContainer({
   latitude = 55.6761,
   longitude = 12.5683,
 }: WeatherContainerProps) {
-  const [data, setData] = useState<WeatherComparison | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [data, setData]                       = useState<WeatherComparison | null>(null)
+  const [dmiForecast, setDmiForecast]         = useState<ForecastHour[]>([])
+  const [yrForecast, setYrForecast]           = useState<ForecastHour[]>([])
+  const [isLoading, setIsLoading]             = useState(true)
+  const [isForecastLoading, setIsForecastLoading] = useState(true)
+  const [error, setError]                     = useState<string | null>(null)
+  const [forecastError, setForecastError]     = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true)
+        setIsForecastLoading(true)
         setError(null)
-        const result = await fetchWeatherFromBothSources(latitude, longitude)
-        setData(result)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch weather data')
+        setForecastError(null)
+
+        // All three fetch calls share one underlying /api/weather request via proxy.ts
+        const [currentResult, dmiForecastResult, yrForecastResult] =
+          await Promise.allSettled([
+            fetchWeatherFromBothSources(latitude, longitude),
+            fetchDmiEdrForecast(latitude, longitude),
+            fetchYrForecast(latitude, longitude),
+          ])
+
+        if (currentResult.status === 'fulfilled') {
+          setData(currentResult.value)
+        } else {
+          setError(
+            currentResult.reason instanceof Error
+              ? currentResult.reason.message
+              : 'Failed to fetch weather data',
+          )
+        }
+
+        if (dmiForecastResult.status === 'fulfilled') {
+          setDmiForecast(dmiForecastResult.value)
+        }
+        if (yrForecastResult.status === 'fulfilled') {
+          setYrForecast(yrForecastResult.value)
+        }
+
+        // Surface a combined forecast error only if both failed
+        if (
+          dmiForecastResult.status === 'rejected' &&
+          yrForecastResult.status === 'rejected'
+        ) {
+          setForecastError('Both DMI and YR forecast data are unavailable.')
+        }
       } finally {
         setIsLoading(false)
+        setIsForecastLoading(false)
       }
     }
 
     fetchData()
-    // Refresh data every 10 minutes
     const interval = setInterval(fetchData, 10 * 60 * 1000)
-
     return () => clearInterval(interval)
   }, [latitude, longitude])
 
   return (
-    <div className="w-full">
+    <div className="w-full space-y-6">
       {error && (
-        <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
+        <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
           <p className="font-semibold">Warning:</p>
           <p>{error}</p>
         </div>
       )}
 
+      {/* Current conditions — side by side */}
       <div className="grid gap-6 md:grid-cols-2">
         {data?.yr ? (
           <YrWeatherDisplay data={data.yr} isLoading={isLoading} />
@@ -59,8 +98,8 @@ export function WeatherContainer({
             )}
             {isLoading && (
               <div className="animate-pulse space-y-2">
-                <div className="h-6 w-24 bg-gray-300 rounded"></div>
-                <div className="h-6 w-24 bg-gray-300 rounded"></div>
+                <div className="h-6 w-24 bg-gray-300 rounded" />
+                <div className="h-6 w-24 bg-gray-300 rounded" />
               </div>
             )}
           </div>
@@ -76,13 +115,26 @@ export function WeatherContainer({
             )}
             {isLoading && (
               <div className="animate-pulse space-y-2">
-                <div className="h-6 w-24 bg-gray-300 rounded"></div>
-                <div className="h-6 w-24 bg-gray-300 rounded"></div>
+                <div className="h-6 w-24 bg-gray-300 rounded" />
+                <div className="h-6 w-24 bg-gray-300 rounded" />
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* 24h forecast comparison — full width */}
+      {forecastError && !isForecastLoading && (
+        <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
+          <p className="font-semibold">Forecast unavailable:</p>
+          <p className="text-sm">{forecastError}</p>
+        </div>
+      )}
+      <ForecastComparisonDisplay
+        dmi={dmiForecast}
+        yr={yrForecast}
+        isLoading={isForecastLoading}
+      />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ForecastHourSchema, type ForecastHour } from './forecast'
 
 // YR.no API Schemas - MET Norway API (api.met.no)
 // Real API response structure from locationforecast/2.0/compact
@@ -63,3 +64,7 @@ export const YrWeatherDataSchema = z.object({
 
 export type YrWeatherData = z.infer<typeof YrWeatherDataSchema>
 export type YrCurrentConditions = z.infer<typeof YrCurrentConditionsSchema>
+
+/** Domain model for a single YR.no forecast hour — alias of the shared ForecastHour. */
+export const YrForecastHourSchema = ForecastHourSchema
+export type YrForecastHour = ForecastHour

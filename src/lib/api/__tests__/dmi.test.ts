@@ -1,32 +1,34 @@
 /**
  * Tests for the DMI (Open-Meteo) client module.
  *
- * These tests mock the fetch call to `/api/weather` (the Next.js proxy)
- * and verify the transformation, validation, and error-handling logic
- * in fetchDmiWeatherData and fetchDmiCurrentConditions.
+ * These tests mock getProxyData (the shared proxy layer) and verify the
+ * transformation, validation, and error-handling logic in fetchDmiWeatherData
+ * and fetchDmiCurrentConditions.
  */
 import { fetchDmiWeatherData, fetchDmiCurrentConditions } from '@/lib/api/dmi'
+import * as proxyModule from '@/lib/api/proxy'
 
-// Save original fetch
-const originalFetch = global.fetch
+jest.mock('@/lib/api/proxy', () => ({
+  getProxyData: jest.fn(),
+}))
+
+const mockGetProxyData = proxyModule.getProxyData as jest.Mock
 
 afterEach(() => {
-  global.fetch = originalFetch
+  jest.clearAllMocks()
 })
 
-function mockFetchSuccess(dmiPayload: unknown) {
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ dmi: dmiPayload }),
+function mockProxySuccess(dmiPayload: unknown) {
+  mockGetProxyData.mockResolvedValue({
+    yr: null,
+    dmi: dmiPayload,
+    dmiEdr: null,
+    errors: { yr: null, dmi: null, dmiEdr: null },
   })
 }
 
-function mockFetchFailure(status: number, statusText: string) {
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: false,
-    status,
-    statusText,
-  })
+function mockProxyFailure(message: string) {
+  mockGetProxyData.mockRejectedValue(new Error(message))
 }
 
 // Realistic Open-Meteo response matching what the proxy returns
@@ -42,7 +44,7 @@ const validOpenMeteoPayload = {
 
 describe('fetchDmiWeatherData', () => {
   it('should transform a valid Open-Meteo response into DmiWeatherData', async () => {
-    mockFetchSuccess(validOpenMeteoPayload)
+    mockProxySuccess(validOpenMeteoPayload)
 
     const result = await fetchDmiWeatherData(55.6761, 12.5683)
 
@@ -73,15 +75,12 @@ describe('fetchDmiWeatherData', () => {
     expect(new Date(result.lastUpdated).getTime()).not.toBeNaN()
   })
 
-  it('should call fetch with the correct URL', async () => {
-    mockFetchSuccess(validOpenMeteoPayload)
+  it('should call getProxyData with the correct coordinates', async () => {
+    mockProxySuccess(validOpenMeteoPayload)
 
     await fetchDmiWeatherData(56.0, 10.0)
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/weather?latitude=56&longitude=10',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    )
+    expect(mockGetProxyData).toHaveBeenCalledWith(56.0, 10.0)
   })
 
   it('should handle missing relative_humidity (optional field)', async () => {
@@ -93,7 +92,7 @@ describe('fetchDmiWeatherData', () => {
         time: '2026-03-04T08:00',
       },
     }
-    mockFetchSuccess(payloadWithoutHumidity)
+    mockProxySuccess(payloadWithoutHumidity)
 
     const result = await fetchDmiWeatherData(55.0, 12.0)
 
@@ -102,7 +101,7 @@ describe('fetchDmiWeatherData', () => {
   })
 
   it('should throw when Open-Meteo response is null', async () => {
-    mockFetchSuccess(null)
+    mockProxySuccess(null)
 
     await expect(fetchDmiWeatherData(55.0, 12.0)).rejects.toThrow(
       'Invalid Open-Meteo response structure',
@@ -110,7 +109,7 @@ describe('fetchDmiWeatherData', () => {
   })
 
   it('should throw when Open-Meteo current field is missing', async () => {
-    mockFetchSuccess({ latitude: 55.0 })
+    mockProxySuccess({ latitude: 55.0 })
 
     await expect(fetchDmiWeatherData(55.0, 12.0)).rejects.toThrow(
       'Invalid Open-Meteo response structure',
@@ -126,22 +125,22 @@ describe('fetchDmiWeatherData', () => {
         time: '2026-03-04T08:00',
       },
     }
-    mockFetchSuccess(invalidPayload)
+    mockProxySuccess(invalidPayload)
 
     await expect(fetchDmiWeatherData(55.0, 12.0)).rejects.toThrow('Invalid DMI response')
   })
 
-  it('should throw on HTTP error after retries', async () => {
-    mockFetchFailure(500, 'Internal Server Error')
+  it('should throw on proxy HTTP error', async () => {
+    mockProxyFailure('HTTP 500: Internal Server Error')
 
     await expect(fetchDmiWeatherData(55.0, 12.0)).rejects.toThrow('HTTP 500: Internal Server Error')
-  }, 15_000)
+  })
 
-  it('should throw on network failure after retries', async () => {
-    global.fetch = jest.fn().mockRejectedValue(new Error('Network error'))
+  it('should throw on network failure', async () => {
+    mockProxyFailure('Network error')
 
     await expect(fetchDmiWeatherData(55.0, 12.0)).rejects.toThrow('Network error')
-  }, 15_000)
+  })
 
   it('should map various WMO weather codes correctly', async () => {
     const testCases: Array<{ code: number; expected: string }> = [
@@ -162,7 +161,7 @@ describe('fetchDmiWeatherData', () => {
           time: '2026-03-04T08:00',
         },
       }
-      mockFetchSuccess(payload)
+      mockProxySuccess(payload)
 
       const result = await fetchDmiWeatherData(55.0, 12.0)
       expect(result.current.weatherDescription.description).toBe(expected)
@@ -172,7 +171,7 @@ describe('fetchDmiWeatherData', () => {
 
 describe('fetchDmiCurrentConditions', () => {
   it('should return only current conditions from a valid response', async () => {
-    mockFetchSuccess(validOpenMeteoPayload)
+    mockProxySuccess(validOpenMeteoPayload)
 
     const result = await fetchDmiCurrentConditions(55.6761, 12.5683)
 
@@ -187,18 +186,17 @@ describe('fetchDmiCurrentConditions', () => {
   })
 
   it('should not include location or forecast data', async () => {
-    mockFetchSuccess(validOpenMeteoPayload)
+    mockProxySuccess(validOpenMeteoPayload)
 
     const result = await fetchDmiCurrentConditions(55.6761, 12.5683)
 
-    // result should NOT have location or forecast keys
     expect(result).not.toHaveProperty('location')
     expect(result).not.toHaveProperty('forecast')
     expect(result).not.toHaveProperty('lastUpdated')
   })
 
   it('should propagate errors from fetchDmiWeatherData', async () => {
-    mockFetchSuccess(null)
+    mockProxySuccess(null)
 
     await expect(fetchDmiCurrentConditions(55.0, 12.0)).rejects.toThrow(
       'Invalid Open-Meteo response structure',
@@ -206,12 +204,6 @@ describe('fetchDmiCurrentConditions', () => {
   })
 
   it('should wrap ZodError in fetchDmiCurrentConditions when current conditions schema fails', async () => {
-    // We need to produce a response that passes fetchDmiWeatherData's schema
-    // but fails DmiCurrentConditionsSchema.parse in fetchDmiCurrentConditions.
-    // This is extremely unlikely in practice, but we can force it by mocking
-    // the module internals. Instead, we test by importing and mocking at a lower level.
-    // Since DmiCurrentConditionsSchema is a subset of DmiWeatherDataSchema.current,
-    // we can mock the DmiCurrentConditionsSchema.parse to throw a ZodError.
     const { z } = await import('zod')
     const schemas = await import('@/lib/schemas/dmi')
 
@@ -226,7 +218,7 @@ describe('fetchDmiCurrentConditions', () => {
       ])
     }
 
-    mockFetchSuccess(validOpenMeteoPayload)
+    mockProxySuccess(validOpenMeteoPayload)
 
     await expect(fetchDmiCurrentConditions(55.0, 12.0)).rejects.toThrow(
       'Invalid DMI conditions',

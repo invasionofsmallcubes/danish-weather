@@ -1,31 +1,34 @@
 /**
  * Tests for the YR.no (MET Norway) client module.
  *
- * These tests mock the fetch call to `/api/weather` (the Next.js proxy)
- * and verify the transformation, validation, and error-handling logic
- * in fetchYrWeatherData and fetchYrCurrentConditions.
+ * These tests mock getProxyData (the shared proxy layer) and verify the
+ * transformation, validation, and error-handling logic in fetchYrWeatherData
+ * and fetchYrCurrentConditions.
  */
 import { fetchYrWeatherData, fetchYrCurrentConditions } from '@/lib/api/yr'
+import * as proxyModule from '@/lib/api/proxy'
 
-const originalFetch = global.fetch
+jest.mock('@/lib/api/proxy', () => ({
+  getProxyData: jest.fn(),
+}))
+
+const mockGetProxyData = proxyModule.getProxyData as jest.Mock
 
 afterEach(() => {
-  global.fetch = originalFetch
+  jest.clearAllMocks()
 })
 
-function mockFetchSuccess(yrPayload: unknown) {
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ yr: yrPayload }),
+function mockProxySuccess(yrPayload: unknown) {
+  mockGetProxyData.mockResolvedValue({
+    yr: yrPayload,
+    dmi: null,
+    dmiEdr: null,
+    errors: { yr: null, dmi: null, dmiEdr: null },
   })
 }
 
-function mockFetchFailure(status: number, statusText: string) {
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: false,
-    status,
-    statusText,
-  })
+function mockProxyFailure(message: string) {
+  mockGetProxyData.mockRejectedValue(new Error(message))
 }
 
 // Realistic MET Norway response shape
@@ -74,7 +77,7 @@ const validMetNorwayPayload = {
 
 describe('fetchYrWeatherData', () => {
   it('should transform a valid MET Norway response into YrWeatherData', async () => {
-    mockFetchSuccess(validMetNorwayPayload)
+    mockProxySuccess(validMetNorwayPayload)
 
     const result = await fetchYrWeatherData(55.6761, 12.5683)
 
@@ -93,22 +96,19 @@ describe('fetchYrWeatherData', () => {
     expect(result.current.weatherIcon.description).toBe('Partly cloudy')
     expect(result.current.timestamp).toBe('2026-03-04T07:00:00Z')
 
-    // Forecast should be empty array (the module doesn't populate it)
+    // Forecast should be empty array
     expect(result.forecast).toEqual([])
 
     // lastUpdated should be a valid ISO date
     expect(new Date(result.lastUpdated).getTime()).not.toBeNaN()
   })
 
-  it('should call fetch with the correct URL', async () => {
-    mockFetchSuccess(validMetNorwayPayload)
+  it('should call getProxyData with the correct coordinates', async () => {
+    mockProxySuccess(validMetNorwayPayload)
 
     await fetchYrWeatherData(56.0, 10.0)
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/weather?latitude=56&longitude=10',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    )
+    expect(mockGetProxyData).toHaveBeenCalledWith(56.0, 10.0)
   })
 
   it('should handle missing wind_from_direction (optional field)', async () => {
@@ -134,7 +134,7 @@ describe('fetchYrWeatherData', () => {
         ],
       },
     }
-    mockFetchSuccess(payloadNoWindDir)
+    mockProxySuccess(payloadNoWindDir)
 
     const result = await fetchYrWeatherData(55.0, 12.0)
 
@@ -162,7 +162,7 @@ describe('fetchYrWeatherData', () => {
         ],
       },
     }
-    mockFetchSuccess(payloadNoSymbol)
+    mockProxySuccess(payloadNoSymbol)
 
     const result = await fetchYrWeatherData(55.0, 12.0)
 
@@ -171,7 +171,7 @@ describe('fetchYrWeatherData', () => {
   })
 
   it('should throw when MET Norway response is null', async () => {
-    mockFetchSuccess(null)
+    mockProxySuccess(null)
 
     await expect(fetchYrWeatherData(55.0, 12.0)).rejects.toThrow(
       'Invalid MET Norway response structure',
@@ -179,7 +179,7 @@ describe('fetchYrWeatherData', () => {
   })
 
   it('should throw when timeseries is empty', async () => {
-    mockFetchSuccess({ properties: { timeseries: [] } })
+    mockProxySuccess({ properties: { timeseries: [] } })
 
     await expect(fetchYrWeatherData(55.0, 12.0)).rejects.toThrow(
       'Invalid MET Norway response structure',
@@ -187,7 +187,7 @@ describe('fetchYrWeatherData', () => {
   })
 
   it('should throw when properties is missing', async () => {
-    mockFetchSuccess({ type: 'Feature' })
+    mockProxySuccess({ type: 'Feature' })
 
     await expect(fetchYrWeatherData(55.0, 12.0)).rejects.toThrow(
       'Invalid MET Norway response structure',
@@ -215,24 +215,24 @@ describe('fetchYrWeatherData', () => {
         ],
       },
     }
-    mockFetchSuccess(invalidPayload)
+    mockProxySuccess(invalidPayload)
 
     await expect(fetchYrWeatherData(55.0, 12.0)).rejects.toThrow('Invalid YR.no response')
   })
 
-  it('should throw on HTTP error after retries', async () => {
-    mockFetchFailure(503, 'Service Unavailable')
+  it('should throw on proxy HTTP error', async () => {
+    mockProxyFailure('HTTP 503: Service Unavailable')
 
     await expect(fetchYrWeatherData(55.0, 12.0)).rejects.toThrow(
       'HTTP 503: Service Unavailable',
     )
-  }, 15_000)
+  })
 
-  it('should throw on network failure after retries', async () => {
-    global.fetch = jest.fn().mockRejectedValue(new Error('fetch failed'))
+  it('should throw on network failure', async () => {
+    mockProxyFailure('fetch failed')
 
     await expect(fetchYrWeatherData(55.0, 12.0)).rejects.toThrow('fetch failed')
-  }, 15_000)
+  })
 
   it('should map various MET Norway symbol codes correctly', async () => {
     const testCases: Array<{ code: string; expected: string }> = [
@@ -273,7 +273,7 @@ describe('fetchYrWeatherData', () => {
           ],
         },
       }
-      mockFetchSuccess(payload)
+      mockProxySuccess(payload)
 
       const result = await fetchYrWeatherData(55.0, 12.0)
       expect(result.current.weatherIcon.description).toBe(expected)
@@ -283,7 +283,7 @@ describe('fetchYrWeatherData', () => {
 
 describe('fetchYrCurrentConditions', () => {
   it('should return only current conditions from a valid response', async () => {
-    mockFetchSuccess(validMetNorwayPayload)
+    mockProxySuccess(validMetNorwayPayload)
 
     const result = await fetchYrCurrentConditions(55.6761, 12.5683)
 
@@ -299,7 +299,7 @@ describe('fetchYrCurrentConditions', () => {
   })
 
   it('should not include location or forecast data', async () => {
-    mockFetchSuccess(validMetNorwayPayload)
+    mockProxySuccess(validMetNorwayPayload)
 
     const result = await fetchYrCurrentConditions(55.6761, 12.5683)
 
@@ -309,7 +309,7 @@ describe('fetchYrCurrentConditions', () => {
   })
 
   it('should propagate errors from fetchYrWeatherData', async () => {
-    mockFetchSuccess(null)
+    mockProxySuccess(null)
 
     await expect(fetchYrCurrentConditions(55.0, 12.0)).rejects.toThrow(
       'Invalid MET Norway response structure',
@@ -331,7 +331,7 @@ describe('fetchYrCurrentConditions', () => {
       ])
     }
 
-    mockFetchSuccess(validMetNorwayPayload)
+    mockProxySuccess(validMetNorwayPayload)
 
     await expect(fetchYrCurrentConditions(55.0, 12.0)).rejects.toThrow(
       'Invalid YR.no conditions',

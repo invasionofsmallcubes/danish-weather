@@ -1,53 +1,7 @@
-import { DmiWeatherDataSchema, DmiCurrentConditionsSchema } from '@/lib/schemas/dmi'
+import { DmiWeatherDataSchema, DmiCurrentConditionsSchema, DmiEdrForecastHourSchema, type DmiEdrForecastHour } from '@/lib/schemas/dmi'
 import { getWeatherDescription } from '@/lib/utils/weatherCodes'
+import { getProxyData } from './proxy'
 import { z } from 'zod'
-
-interface FetchOptions {
-  timeout?: number
-  retries?: number
-}
-
-const DEFAULT_OPTIONS: Required<FetchOptions> = {
-  timeout: 5000,
-  retries: 2,
-}
-
-async function fetchWithRetry(
-  url: string,
-  options: FetchOptions = {},
-): Promise<Response> {
-  const timeout = options.timeout ?? DEFAULT_OPTIONS.timeout
-  const retries = options.retries ?? DEFAULT_OPTIONS.retries
-
-  let lastError: Error | null = null
-
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-      const response = await fetch(url, {
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      return response
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
-
-      if (i < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)))
-      }
-    }
-  }
-
-  throw lastError || new Error('Failed to fetch after retries')
-}
 
 interface OpenMeteoResponse {
   current: {
@@ -65,9 +19,7 @@ interface OpenMeteoResponse {
  */
 export async function fetchDmiWeatherData(latitude: number, longitude: number) {
   try {
-    const url = `/api/weather?latitude=${latitude}&longitude=${longitude}`
-    const response = await fetchWithRetry(url, { timeout: 5000, retries: 2 })
-    const data = await response.json()
+    const data = await getProxyData(latitude, longitude)
 
     // Extract Open-Meteo data from proxy response
     const openMeteoData = data.dmi as OpenMeteoResponse | null
@@ -123,6 +75,32 @@ export async function fetchDmiCurrentConditions(latitude: number, longitude: num
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new Error(`Invalid DMI conditions: ${error.message}`)
+    }
+    throw error
+  }
+}
+
+/**
+ * Fetch 24-hour hourly forecast from DMI EDR API (via Next.js proxy).
+ * Returns up to 25 entries (current hour + next 24 hours).
+ */
+export async function fetchDmiEdrForecast(
+  latitude: number,
+  longitude: number,
+): Promise<DmiEdrForecastHour[]> {
+  const data = await getProxyData(latitude, longitude)
+
+  const raw = data.dmiEdr as unknown
+
+  if (!Array.isArray(raw)) {
+    throw new Error('Invalid DMI EDR response: dmiEdr is not an array')
+  }
+
+  try {
+    return z.array(DmiEdrForecastHourSchema).parse(raw)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(`Invalid DMI EDR forecast: ${error.message}`)
     }
     throw error
   }

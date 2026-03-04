@@ -1,6 +1,40 @@
 import { z } from 'zod'
+import { ForecastHourSchema, type ForecastHour } from './forecast'
 
-// DMI Schemas - Open-Meteo API
+// ─── DMI EDR API Schemas ──────────────────────────────────────────────────────
+// Real API: https://dmigw.govcloud.dk/v1/forecastedr
+// Collection: harmonie_dini_sf (1-hour steps, GeoJSON output)
+// Temperature is returned in Kelvin; domain model stores °C.
+
+export const DmiEdrFeaturePropertiesSchema = z.object({
+  step: z.string(),
+  'temperature-2m': z.number(),          // Kelvin
+  'wind-speed': z.number(),              // m/s
+  'wind-dir': z.number(),               // degrees true north
+  'relative-humidity-2m': z.number(),   // %
+  'total-precipitation': z.number().optional().default(0), // mm
+})
+
+export const DmiEdrFeatureSchema = z.object({
+  type: z.literal('Feature'),
+  geometry: z.object({
+    type: z.literal('Point'),
+    coordinates: z.tuple([z.number(), z.number()]),
+  }),
+  properties: DmiEdrFeaturePropertiesSchema,
+})
+
+export const DmiEdrResponseSchema = z.object({
+  type: z.literal('FeatureCollection'),
+  features: z.array(DmiEdrFeatureSchema),
+})
+
+/** Domain model for a single DMI forecast hour — alias of the shared ForecastHour. */
+export const DmiEdrForecastHourSchema = ForecastHourSchema
+export type DmiEdrForecastHour = ForecastHour
+export type DmiEdrResponse = z.infer<typeof DmiEdrResponseSchema>
+
+// ─── DMI Schemas - Open-Meteo API ────────────────────────────────────────────
 // Real API response structure from api.open-meteo.com
 
 export const OpenMeteoCurrentSchema = z.object({
