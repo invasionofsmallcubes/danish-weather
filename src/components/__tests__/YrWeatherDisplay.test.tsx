@@ -62,7 +62,7 @@ describe('YrWeatherDisplay', () => {
     render(<YrWeatherDisplay data={dataWithWindDirection} />)
 
     expect(screen.getByText('Wind Direction:')).toBeInTheDocument()
-    expect(screen.getByText('SW (225°)')).toBeInTheDocument()
+    expect(screen.getByText('SW')).toBeInTheDocument()
   })
 
   it('does not render wind direction when not provided', () => {
@@ -91,7 +91,7 @@ describe('YrWeatherDisplay', () => {
     expect(screen.getByText('5.4 m/s')).toBeInTheDocument()
     expect(screen.getByText('Partly cloudy')).toBeInTheDocument()
     expect(screen.getByText('90%')).toBeInTheDocument()
-    expect(screen.getByText('NE (45°)')).toBeInTheDocument()
+    expect(screen.getByText('NE')).toBeInTheDocument()
   })
 
   it('defaults isLoading to false', () => {

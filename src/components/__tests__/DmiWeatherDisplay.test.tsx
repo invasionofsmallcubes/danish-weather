@@ -57,7 +57,7 @@ describe('DmiWeatherDisplay', () => {
     render(<DmiWeatherDisplay data={dataWithWindDirection} />)
 
     expect(screen.getByText('Wind Direction:')).toBeInTheDocument()
-    expect(screen.getByText('S (180°)')).toBeInTheDocument()
+    expect(screen.getByText('S')).toBeInTheDocument()
   })
 
   it('does not render wind direction when not provided', () => {
@@ -87,7 +87,7 @@ describe('DmiWeatherDisplay', () => {
     expect(screen.getByText('8.2 m/s')).toBeInTheDocument()
     expect(screen.getByText('Partly cloudy')).toBeInTheDocument()
     expect(screen.getByText('65%')).toBeInTheDocument()
-    expect(screen.getByText('W (270°)')).toBeInTheDocument()
+    expect(screen.getByText('W')).toBeInTheDocument()
   })
 
   it('defaults isLoading to false', () => {
