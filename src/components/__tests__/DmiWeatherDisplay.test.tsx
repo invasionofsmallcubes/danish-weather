@@ -59,7 +59,6 @@ describe('DmiWeatherDisplay — loading state', () => {
   it('defaults isLoading to false and renders content', () => {
     render(<DmiWeatherDisplay data={baseDmiData} />)
     expect(screen.getByText('DMI Weather')).toBeInTheDocument()
-    expect(container => container).toBeTruthy()
   })
 
   it('does not render skeleton when isLoading is false', () => {
