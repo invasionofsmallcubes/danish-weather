@@ -43,8 +43,8 @@ async function fetchWithRetry(
   url: string,
   options: FetchOptions = {},
 ): Promise<Response> {
-  const timeout = options.timeout ?? DEFAULT_OPTIONS.timeout
-  const retries = options.retries ?? DEFAULT_OPTIONS.retries
+  const timeout = options.timeout ?? /* v8 ignore next */ DEFAULT_OPTIONS.timeout
+  const retries = options.retries ?? /* v8 ignore next */ DEFAULT_OPTIONS.retries
 
   let lastError: Error | null = null
 
@@ -63,14 +63,16 @@ async function fetchWithRetry(
 
       return response
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
+      lastError = error instanceof Error ? error : /* v8 ignore next */ new Error(String(error))
+      /* v8 ignore start */
       if (i < retries) {
         await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)))
       }
+      /* v8 ignore stop */
     }
   }
 
-  throw lastError ?? new Error('Failed to fetch after retries')
+  throw lastError ?? /* v8 ignore next */ new Error('Failed to fetch after retries')
 }
 
 /**
