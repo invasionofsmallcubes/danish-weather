@@ -1,6 +1,7 @@
 'use client'
 
 import { DmiCurrentConditions } from '@/lib/schemas/dmi'
+import { degreesToCompass } from '@/lib/utils/wind'
 
 interface DmiWeatherDisplayProps {
   data: DmiCurrentConditions
@@ -54,7 +55,7 @@ export function DmiWeatherDisplay({ data, isLoading = false }: DmiWeatherDisplay
           <div className="flex justify-between items-center">
             <span className="text-gray-700">Wind Direction:</span>
             <span className="text-lg font-semibold text-red-600">
-              {data.windDirection.value}°
+              {degreesToCompass(data.windDirection.value)} ({data.windDirection.value}°)
             </span>
           </div>
         )}
