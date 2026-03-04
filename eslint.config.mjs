@@ -12,6 +12,7 @@ export default [
       "build/**",
       ".open-next/**",
       ".wrangler/**",
+      "coverage/**",
       "next-env.d.ts",
     ],
   },
