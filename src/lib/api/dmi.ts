@@ -7,8 +7,9 @@ interface OpenMeteoResponse {
   current: {
     temperature_2m: number
     wind_speed_10m: number
+    wind_direction_10m?: number
+    relative_humidity_2m?: number
     weather_code: number
-    relative_humidity?: number
     time: string
   }
 }
@@ -45,7 +46,10 @@ export async function fetchDmiWeatherData(latitude: number, longitude: number) {
       current: {
         temperature: { value: current.temperature_2m, unit: '°C' as const },
         windSpeed: { value: windSpeedMps, unit: 'm/s' as const },
-        humidity: current.relative_humidity,
+        windDirection: current.wind_direction_10m !== undefined
+          ? { value: current.wind_direction_10m, unit: 'degrees' as const }
+          : undefined,
+        humidity: current.relative_humidity_2m,
         weatherDescription: {
           code: current.weather_code,
           description,

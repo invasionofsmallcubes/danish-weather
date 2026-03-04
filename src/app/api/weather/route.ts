@@ -32,6 +32,8 @@ interface OpenMeteoResponse {
   current: {
     temperature_2m: number
     wind_speed_10m: number
+    wind_direction_10m: number
+    relative_humidity_2m: number
     weather_code: number
     time: string
   }
@@ -77,7 +79,7 @@ async function fetchOpenMeteo(latitude: number, longitude: number): Promise<Open
     const url = new URL('https://api.open-meteo.com/v1/forecast')
     url.searchParams.set('latitude', latitude.toString())
     url.searchParams.set('longitude', longitude.toString())
-    url.searchParams.set('current', 'temperature_2m,wind_speed_10m,weather_code')
+    url.searchParams.set('current', 'temperature_2m,wind_speed_10m,wind_direction_10m,relative_humidity_2m,weather_code')
 
     const response = await fetch(url.toString(), {
       cache: 'no-cache',

@@ -36,8 +36,9 @@ const validOpenMeteoPayload = {
   current: {
     temperature_2m: 8.5,
     wind_speed_10m: 18.0, // km/h
+    wind_direction_10m: 270,
+    relative_humidity_2m: 82,
     weather_code: 3,
-    relative_humidity: 82,
     time: '2026-03-04T07:00',
   },
 }
