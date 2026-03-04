@@ -30,8 +30,8 @@ export async function fetchDmiWeatherData(latitude: number, longitude: number) {
 
     const current = openMeteoData.current
     const description = getWeatherDescription(current.weather_code)
-    // Open-Meteo returns wind speed in km/h, convert to m/s
-    const windSpeedMps = current.wind_speed_10m / 3.6
+    // Open-Meteo returns wind speed in km/h, convert to m/s and round to 1 decimal
+    const windSpeedMps = Math.round((current.wind_speed_10m / 3.6) * 10) / 10
 
     // Validate and transform response
     const validated = DmiWeatherDataSchema.parse({

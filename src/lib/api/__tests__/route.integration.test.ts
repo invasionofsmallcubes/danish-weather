@@ -12,7 +12,7 @@
  * Coordinates used: Copenhagen (55.6761, 12.5683)
  */
 
-const API_TIMEOUT = 30_000
+const API_TIMEOUT = 60_000
 
 // Same coordinates the app uses
 const COPENHAGEN = { lat: 55.6761, lon: 12.5683 }
