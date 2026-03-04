@@ -151,9 +151,11 @@ async function fetchDmiEdr(
     'temperature-2m,wind-speed,wind-dir,relative-humidity-2m,total-precipitation',
   )
   url.searchParams.set('f', 'GeoJSON')
-  url.searchParams.set('datetime', buildDatetimeInterval())
+  // Append datetime manually: URLSearchParams encodes '/' as '%2F', which
+  // makes the DMI EDR API reject the interval with a 400 Bad Request.
+  const edrUrl = `${url.toString()}&datetime=${buildDatetimeInterval()}`
 
-  const response = await fetch(url.toString(), { cache: 'no-cache' })
+  const response = await fetch(edrUrl, { cache: 'no-cache' })
 
   if (!response.ok) {
     throw new Error(`DMI EDR HTTP ${response.status}: ${response.statusText}`)

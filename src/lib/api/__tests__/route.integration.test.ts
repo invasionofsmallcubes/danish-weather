@@ -208,121 +208,81 @@ describe('DMI EDR API (real integration)', () => {
       'temperature-2m,wind-speed,wind-dir,relative-humidity-2m,total-precipitation',
     )
     url.searchParams.set('f', 'GeoJSON')
-    url.searchParams.set('datetime', datetime)
-    return url.toString()
+    // Append datetime manually: URLSearchParams encodes '/' as '%2F', which
+    // makes the DMI EDR API reject the interval with a 400 Bad Request.
+    return `${url.toString()}&datetime=${datetime}`
   }
 
-  it(
-    'should return a GeoJSON FeatureCollection for Copenhagen',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      expect(response.ok).toBe(true)
-      const data = await response.json()
+  // Fetch once and share across all tests in this describe block to avoid
+  // hitting the DMI EDR rate limit with multiple parallel requests.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let edrData: any
+  beforeAll(async () => {
+    const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
+    expect(response.ok).toBe(true)
+    edrData = await response.json()
+  }, API_TIMEOUT)
 
-      expect(data.type).toBe('FeatureCollection')
-      expect(Array.isArray(data.features)).toBe(true)
-      expect(data.features.length).toBeGreaterThan(0)
-    },
-    API_TIMEOUT,
-  )
+  it('should return a GeoJSON FeatureCollection for Copenhagen', () => {
+    expect(edrData.type).toBe('FeatureCollection')
+    expect(Array.isArray(edrData.features)).toBe(true)
+    expect(edrData.features.length).toBeGreaterThan(0)
+  })
 
-  it(
-    'should return ~24 hourly features for Copenhagen',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      const data = await response.json()
+  it('should return ~24 hourly features for Copenhagen', () => {
+    // EDR steps are 1h, so we expect roughly 24 features
+    expect(edrData.features.length).toBeGreaterThanOrEqual(20)
+    expect(edrData.features.length).toBeLessThanOrEqual(26)
+  })
 
-      // EDR steps are 1h, so we expect roughly 24 features
-      expect(data.features.length).toBeGreaterThanOrEqual(20)
-      expect(data.features.length).toBeLessThanOrEqual(26)
-    },
-    API_TIMEOUT,
-  )
+  it('should include all required parameters in each feature', () => {
+    const first = edrData.features[0]
+    const p = first.properties
 
-  it(
-    'should include all required parameters in each feature',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      const data = await response.json()
+    expect(typeof p['temperature-2m']).toBe('number')
+    expect(typeof p['wind-speed']).toBe('number')
+    expect(typeof p['wind-dir']).toBe('number')
+    expect(typeof p['relative-humidity-2m']).toBe('number')
+    expect(typeof p.step).toBe('string')
+  })
 
-      const first = data.features[0]
-      const p = first.properties
+  it('should return temperatures in Kelvin (values around 273±50)', () => {
+    const first = edrData.features[0]
+    const tempK: number = first.properties['temperature-2m']
 
-      expect(typeof p['temperature-2m']).toBe('number')
-      expect(typeof p['wind-speed']).toBe('number')
-      expect(typeof p['wind-dir']).toBe('number')
-      expect(typeof p['relative-humidity-2m']).toBe('number')
-      expect(typeof p.step).toBe('string')
-    },
-    API_TIMEOUT,
-  )
+    // Denmark: roughly -20°C to 40°C → 253K to 313K
+    expect(tempK).toBeGreaterThan(253)
+    expect(tempK).toBeLessThan(313)
+  })
 
-  it(
-    'should return temperatures in Kelvin (values around 273±50)',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      const data = await response.json()
+  it('should return wind speeds in m/s (non-negative, plausible range)', () => {
+    for (const feature of edrData.features.slice(0, 5)) {
+      const ws: number = feature.properties['wind-speed']
+      expect(ws).toBeGreaterThanOrEqual(0)
+      expect(ws).toBeLessThan(60) // extreme upper bound
+    }
+  })
 
-      const first = data.features[0]
-      const tempK: number = first.properties['temperature-2m']
+  it('should return wind direction in 0–360 range', () => {
+    for (const feature of edrData.features.slice(0, 5)) {
+      const wd: number = feature.properties['wind-dir']
+      expect(wd).toBeGreaterThanOrEqual(0)
+      expect(wd).toBeLessThanOrEqual(360)
+    }
+  })
 
-      // Denmark: roughly -20°C to 40°C → 253K to 313K
-      expect(tempK).toBeGreaterThan(253)
-      expect(tempK).toBeLessThan(313)
-    },
-    API_TIMEOUT,
-  )
-
-  it(
-    'should return wind speeds in m/s (non-negative, plausible range)',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      const data = await response.json()
-
-      for (const feature of data.features.slice(0, 5)) {
-        const ws: number = feature.properties['wind-speed']
-        expect(ws).toBeGreaterThanOrEqual(0)
-        expect(ws).toBeLessThan(60) // extreme upper bound
-      }
-    },
-    API_TIMEOUT,
-  )
-
-  it(
-    'should return wind direction in 0–360 range',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      const data = await response.json()
-
-      for (const feature of data.features.slice(0, 5)) {
-        const wd: number = feature.properties['wind-dir']
-        expect(wd).toBeGreaterThanOrEqual(0)
-        expect(wd).toBeLessThanOrEqual(360)
-      }
-    },
-    API_TIMEOUT,
-  )
-
-  it(
-    'should return humidity in 0–100 range',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      const data = await response.json()
-
-      for (const feature of data.features.slice(0, 5)) {
-        const rh: number = feature.properties['relative-humidity-2m']
-        expect(rh).toBeGreaterThanOrEqual(0)
-        expect(rh).toBeLessThanOrEqual(100)
-      }
-    },
-    API_TIMEOUT,
-  )
+  it('should return humidity in 0–100 range', () => {
+    for (const feature of edrData.features.slice(0, 5)) {
+      const rh: number = feature.properties['relative-humidity-2m']
+      expect(rh).toBeGreaterThanOrEqual(0)
+      expect(rh).toBeLessThanOrEqual(100)
+    }
+  })
 
   it(
     'should have ascending step timestamps',
-    async () => {
-      const response = await fetch(buildEdrUrl(COPENHAGEN.lat, COPENHAGEN.lon))
-      const data = await response.json()
+    () => {
+      const data = edrData
 
       const times: number[] = data.features.map(
         (f: { properties: { step: string } }) => new Date(f.properties.step).getTime(),
