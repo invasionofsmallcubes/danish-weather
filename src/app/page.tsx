@@ -1,4 +1,5 @@
 import { WeatherContainer } from '@/components/WeatherContainer'
+import { Calendar } from '@/components/Calendar'
 
 export default function Home() {
   return (
@@ -19,6 +20,10 @@ export default function Home() {
             {/* Latitude and longitude for Copenhagen */}
             <WeatherContainer latitude={55.6761} longitude={12.5683} />
           </div>
+        </div>
+
+        <div className="mb-8">
+          <Calendar />
         </div>
 
         <footer className="text-center text-sm text-gray-600">

@@ -6,3 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "APPOINTMENTS"
+id = "5504360ea1564b2aa1736e01c91eb4c1"
