@@ -42,7 +42,8 @@
   },
   "include": [
     "src",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "cloudflare-env.d.ts"
   ],
   "exclude": [
     "node_modules"
