@@ -2,13 +2,16 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import Home from '@/app/page'
 
-// Mock WeatherContainer since it has its own test suite
 jest.mock('@/components/WeatherContainer', () => ({
   WeatherContainer: ({ latitude, longitude }: { latitude: number; longitude: number }) => (
     <div data-testid="weather-container" data-lat={latitude} data-lon={longitude}>
       Mocked WeatherContainer
     </div>
   ),
+}))
+
+jest.mock('@/components/Calendar', () => ({
+  Calendar: () => <div data-testid="calendar">Mocked Calendar</div>,
 }))
 
 describe('Home page', () => {
