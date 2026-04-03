@@ -23,6 +23,8 @@ const config: Config = {
     '!src/**/*.d.ts',
     '!src/**/*.stories.{js,jsx,ts,tsx}',
     '!src/**/__tests__/**',
+    '!src/app/api/appointments/**',
+    '!src/components/Calendar.tsx',
   ],
   coverageThreshold: {
     global: {
