@@ -17,14 +17,14 @@ interface Appointment {
 }
 
 interface KVNamespace {
-  get(key: string, options?: { type: 'text' | 'json' }): Promise<string | null | any>
-  put(key: string, value: string | Record<string, unknown>): Promise<void>
+  get(key: string, options?: { type: 'text' | 'json' }): Promise<unknown>
+  put(key: string, value: string): Promise<void>
 }
 
 async function getAppointments(): Promise<Appointment[]> {
   try {
     const cf = getCloudflareContext()
-    const kv = cf.env.APPOINTMENTS as unknown as KVNamespace
+    const kv = (cf.env as any).APPOINTMENTS as KVNamespace
     const data = await kv.get(APPOINTMENTS_KEY, 'json')
     return (data as Appointment[]) || []
   } catch (err) {
@@ -35,7 +35,7 @@ async function getAppointments(): Promise<Appointment[]> {
 
 async function saveAppointments(appointments: Appointment[]): Promise<void> {
   const cf = getCloudflareContext()
-  const kv = cf.env.APPOINTMENTS as unknown as KVNamespace
+  const kv = (cf.env as any).APPOINTMENTS as KVNamespace
   await kv.put(APPOINTMENTS_KEY, JSON.stringify(appointments))
 }
 
