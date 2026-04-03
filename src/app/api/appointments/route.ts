@@ -25,8 +25,8 @@ async function getAppointments(): Promise<Appointment[]> {
   try {
     const cf = getCloudflareContext()
     const kv = (cf.env as any).APPOINTMENTS as KVNamespace
-    const data = await kv.get(APPOINTMENTS_KEY, 'json')
-    return (data as Appointment[]) || []
+    const data = (await kv.get(APPOINTMENTS_KEY, { type: 'json' })) as Appointment[] | null
+    return data || []
   } catch (err) {
     console.error('Failed to get appointments from KV:', err)
     return []
